@@ -1,0 +1,291 @@
+
+def generate_audio_from_script(script_text):
+    try:
+        tts = gTTS(script_text, lang='en')
+        audio_filename = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}_audio.mp3")
+        tts.save(audio_filename)
+        return audio_filename
+    except Exception as e:
+        logging.error(f"Error generating audio: {e}")
+        return None
+    
+
+def get_audio_duration(audio_file):
+    try:
+        # Probe the audio file using ffmpeg to get detailed information
+        audio_info = ffmpeg.probe(audio_file,cmd='ffprobe', v='error', select_streams='a:0', show_entries='stream=duration')
+        
+        # Extract the duration from the probe output
+        audio_duration = float(audio_info['streams'][0]['duration'])
+        
+        return audio_duration
+    except ffmpeg.Error as e:
+        # Handle any error related to ffmpeg
+        print(f"Error getting audio duration: {e.stderr.decode()}")
+        return None
+    except Exception as e:
+        # Catch any other exceptions
+        print(f"Unexpected error: {e}")
+        return None
+
+
+# Function to create a black screen video
+def create_video_from_audio(audio_file):
+    try:
+        # Step 1: Get the audio duration
+        audio_duration = get_audio_duration(audio_file)
+        if not audio_duration:
+            raise ValueError("Failed to retrieve audio duration.")
+        
+        # Step 2: Create a video filename using UUID
+        video_filename = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}_video.mp4")
+        
+        # Step 3: Create a black screen video with the same duration as the audio
+        ffmpeg_command = [
+            'ffmpeg', '-f', 'lavfi', '-t', str(audio_duration),
+            '-i', 'color=c=black:s=1280x720', '-vcodec', 'libx264', '-an', video_filename
+        ]
+        
+        # Execute the ffmpeg command to create the video
+        subprocess.run(ffmpeg_command, check=True)
+
+        return video_filename
+
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error creating video: {e.stderr}")
+        return None
+    except ValueError as e:
+        logging.error(f"ValueError: {e}")
+        return None
+    except Exception as e:
+        logging.error(f"Unexpected error creating video: {e}")
+        return None
+
+
+# Function to combine the video and audio
+def combine_audio_and_video(video_file, audio_file):
+    try:
+        # Generate the final video filename using UUID
+        final_video_file = os.path.join(UPLOAD_FOLDER, f"{uuid.uuid4().hex}_final_video.mp4")
+        
+        video_clip = VideoFileClip(video_file)
+        audio_clip = AudioFileClip(audio_file)
+        
+        # Set the duration of the video clip to match the audio
+        video_clip = video_clip.subclip(0, audio_clip.duration)
+        
+        # Combine audio and video
+        final_video = video_clip.set_audio(audio_clip)
+        
+        # Write the final output
+        final_video.write_videofile(final_video_file, codec='libx264', audio_codec='aac')
+
+        return final_video_file
+
+    except Exception as e:
+        logging.error(f"Error combining audio and video: {e}")
+        return None
+
+# Main function to handle the full process
+@app.route('/generate-test-to-video', methods=['POST'])
+def generate_video_from_script():
+    try:
+        data = request.json
+        script_text = data.get('script')
+        # Step 1: Generate the audio from the script
+        audio_file = generate_audio_from_script(script_text)
+        if not audio_file or not os.path.exists(audio_file):
+            return jsonify({
+                'error': 'Audio file is missing or invalid.'
+            }), 400  # Return a 400 Bad Request status if the audio file is missing or invalid
+
+        # Step 2: Create a video from the audio
+        video_file = create_video_from_audio(audio_file)
+        if not video_file:
+            return jsonify({
+                'error': 'Failed to create video from audio.'
+            }), 500  # Return a 500 Internal Server Error if video creation fails
+
+        # Step 3: Combine the video and audio into the final video
+        final_video_file = combine_audio_and_video(video_file, audio_file)
+        if not final_video_file:
+            return jsonify({
+                'error': 'Failed to combine video and audio.'
+            }), 500  # Return a 500 Internal Server Error if combining video and audio fails
+        
+        # If everything is successful, return the final video file path
+        return jsonify({
+            'message': 'Video successfully created.',
+            'final_video': final_video_file
+        }), 200  # Return a 200 OK status with the final video file path
+
+    
+        
+        # return jsonify(final_video_file)
+    except Exception as e:
+        logging.error(f"Error generating video: {e}")
+        return None
+    
+
+
+    # # app.py 
+
+# # # Libraries for building GUI 
+# # import tkinter as tk
+# # import customtkinter as ctk 
+
+# # # Machine Learning libraries 
+# # import torch
+# # from torch import autocast
+# # from diffusers import StableDiffusionPipeline
+
+# # # Libraries for processing image 
+# # from PIL import ImageTk
+
+# # # private modules 
+# # from authtoken import auth_token
+
+
+# # # Create app user interface
+# # app = tk.Tk()
+# # app.geometry("532x632")
+# # app.title("Text to Image app")
+# # app.configure(bg='black')
+# # ctk.set_appearance_mode("dark") 
+
+# # # Create input box on the user interface 
+# # prompt = ctk.CTkEntry(height=40, width=512, text_font=("Arial", 15), text_color="white", fg_color="black") 
+# # prompt.place(x=10, y=10)
+
+# # # Create a placeholder to show the generated image
+# # img_placeholder = ctk.CTkLabel(height=512, width=512, text="")
+# # img_placeholder.place(x=10, y=110)
+
+# # # Download stable diffusion model from hugging face 
+# # modelid = "CompVis/stable-diffusion-v1-4"
+# # device = "cuda"
+# # stable_diffusion_model = StableDiffusionPipeline.from_pretrained(modelid, revision="fp16", torch_dtype=torch.float16, use_auth_token=auth_token) 
+# # stable_diffusion_model.to(device) 
+
+# # # Generate image from text 
+# # def generate_image(): 
+# #     """ This function generate image from a text with stable diffusion"""
+# #     with autocast(device): 
+# #         image = stable_diffusion_model(prompt.get(),guidance_scale=8.5)["sample"][0]
+    
+# #     # Save the generated image
+# #     image.save('generatedimage.png')
+    
+# #     # Display the generated image on the user interface
+# #     img = ImageTk.PhotoImage(image)
+# #     img_placeholder.configure(image=img) 
+
+
+# # trigger = ctk.CTkButton(height=40, width=120, text_font=("Arial", 15), text_color="black", fg_color="white",
+# #                          command=generate_image) 
+# # trigger.configure(text="Generate")
+# # trigger.place(x=206, y=60) 
+
+# # app.mainloop()
+
+
+# # import streamlit as st
+# # from diffusers import StableDiffusionPipeline
+# # import torch
+
+# # # Load Stable Diffusion model from Hugging Face
+# # # Make sure to replace 'your_huggingface_token' with your actual token
+# # pipe = StableDiffusionPipeline.from_pretrained(
+# #     "CompVis/stable-diffusion-v1-4", 
+# #     use_auth_token='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'
+# # )
+
+# # # Move the model to GPU if available for faster processing
+# # pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+# # # Streamlit app UI
+# # st.title("Text-to-Image Generator")
+
+# # # Input field for text prompt
+# # prompt = st.text_input("Enter a text prompt:")
+
+# # # Generate image when prompt is entered
+# # if prompt:
+# #     with st.spinner("Generating image..."):
+# #         # Generate image based on the prompt
+# #         image = pipe(prompt).images[0]
+        
+# #         # Show the generated image in Streamlit
+# #         st.image(image, caption=f"Generated Image for: {prompt}")
+        
+# #         # Optionally save the image to disk
+# #         image.save("generated_image.png")
+# #         st.success("Image saved as 'generated_image.png'.")
+
+
+
+# # from PIL import Image, ImageDraw, ImageFont
+# # import random
+
+# # def generate_sunset_image(description):
+# #     # Create a blank image
+# #     width, height = 512, 512
+# #     img = Image.new('RGB', (width, height), color=(255, 255, 255))
+# #     draw = ImageDraw.Draw(img)
+
+# #     # Background (sunset colors)
+# #     sunset_colors = [(255, 204, 0), (255, 153, 51), (204, 102, 0), (102, 51, 0)]
+# #     draw.rectangle([0, 0, width, height], fill=random.choice(sunset_colors))
+
+# #     # Draw a sun (simple circle)
+# #     sun_color = (255, 204, 0)
+# #     sun_radius = 50
+# #     draw.ellipse([width//2 - sun_radius, height//2 - sun_radius, width//2 + sun_radius, height//2 + sun_radius], fill=sun_color)
+
+# #     # Add text description (optional)
+# #     font = ImageFont.load_default()
+# #     draw.text((10, 10), description, fill=(255, 255, 255), font=font)
+
+# #     return img
+
+# # # Generate a sunset image from description
+# # description = "A beautiful sunset over the ocean."
+# # image = generate_sunset_image(description)
+
+# # # Show and save the generated image
+# # image.show()
+# # image.save("sunset_image.png")
+
+
+
+# from diffusers import StableDiffusionPipeline
+# import torch
+
+# # Load Stable Diffusion model from Hugging Face
+# # Make sure to replace 'your_huggingface_token' with your actual token
+# pipe = StableDiffusionPipeline.from_pretrained(
+#     "CompVis/stable-diffusion-v1-4", 
+#     use_auth_token='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'
+# )
+
+# # Move the model to GPU if available for faster processing
+# pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+# def generate_image(prompt):
+#     """
+#     Function to generate an image from a text prompt.
+#     """
+#     # Generate image from the text prompt
+#     image = pipe(prompt).images[0]
+    
+#     # Save the generated image
+#     image.save("generated_image.png")
+    
+#     # Display the generated image (optional, you can open it manually later)
+#     image.show()
+
+# # Example usage: Change the prompt to any text you'd like
+# text_prompt = "A futuristic city skyline at sunset"
+# generate_image(text_prompt)
+
+# print("Image generated and saved as 'generated_image.png'")

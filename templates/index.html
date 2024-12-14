@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Social Media Video Downloader & AI Video Generator</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-100">
+  <!-- Navbar -->
+  <nav class="bg-blue-600 p-4 shadow-lg">
+    <div class="container mx-auto flex justify-between items-center">
+      <a href="#" class="text-white text-2xl font-bold">
+        Social Media Video Downloader & AI Video Generator
+      </a>
+      <ul class="flex space-x-4">
+        <li>
+          <a href="#videoProcessor" class="text-white hover:underline">Download Social Video</a>
+        </li>
+        <li>
+          <a href="#AIVideoGenerator" class="text-white hover:underline">AI Video Generator</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Landing Page Content -->
+  <section class="bg-gray-100 py-20" id="home">
+    <div class="container mx-auto text-center">
+      <h1 class="text-4xl font-bold text-gray-800">
+        Download & Generate Videos
+      </h1>
+      <p class="text-gray-600 mt-4">
+        Easily download and process videos from YouTube, Instagram, and Facebook, or generate custom AI-powered videos.
+      </p>
+      <a href="#videoProcessor"
+        class="mt-8 inline-block px-8 py-4 bg-blue-600 text-white rounded-md text-lg hover:bg-blue-500">
+        Get Started
+      </a>
+    </div>
+  </section>
+
+  <!-- Video Processor Form -->
+  <section id="videoProcessor" class="bg-white py-12">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+      <h2 class="text-3xl font-bold text-center text-gray-800">
+        Process Your Video
+      </h2>
+
+      <!-- Form to process a video -->
+      <form id="videoForm" class="mt-6">
+        <label for="platform" class="block text-gray-700 font-semibold">Select Platform:</label>
+        <select id="platform" name="platform" required
+          class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+          <option value="youtube">YouTube</option>
+          <option value="instagram">Instagram</option>
+          <option value="facebook">Facebook</option>
+        </select>
+
+        <label for="videoUrl" class="block mt-4 text-gray-700 font-semibold">Video URL:</label>
+        <input type="url" id="videoUrl" name="videoUrl" required
+          class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" />
+
+        <label for="segmentLength" class="block mt-4 text-gray-700 font-semibold youtube-only">Segment Length
+          (seconds):</label>
+        <input type="number" id="segmentLength" name="segmentLength" value="60"
+          class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 youtube-only" />
+
+        <div class="flex justify-between mt-6">
+          <button type="submit"
+            class="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-500 focus:outline-none">
+            Process Video
+          </button>
+        </div>
+      </form>
+
+      <div id="responseMessage" class="mt-4 text-center text-gray-800"></div>
+    </div>
+  </section>
+
+  <!-- AI Video Generator Form -->
+  <section id="AIVideoGenerator" class="bg-white py-12">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-lg">
+      <h2 class="text-3xl font-bold text-center text-gray-800">
+        AI Video Generator
+      </h2>
+
+      <!-- Form to generate an AI-based video -->
+      <form id="aiVideoForm" class="mt-6">
+        <label for="aiScript" class="block text-gray-700 font-semibold">Script for AI Video:</label>
+        <textarea id="aiScript" name="aiScript" required
+          class="w-full px-4 py-2 mt-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          rows="5"></textarea>
+
+        <div class="flex justify-between mt-6">
+          <button type="submit"
+            class="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-500 focus:outline-none">
+            Generate AI Video
+          </button>
+        </div>
+      </form>
+
+      <div id="aiResponseMessage" class="mt-4 text-center text-gray-800"></div>
+    </div>
+  </section>
+
+  <!-- Processed Videos Section -->
+  <section id="processedVideos" class="bg-gray-100 py-12">
+    <div class="container mx-auto">
+      <h2 class="text-3xl font-bold text-center text-gray-800">
+        Processed Videos
+      </h2>
+      <ul id="videoList" class="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></ul>
+    </div>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchProcessedVideos();
+
+      // Video Processing Form Submission
+      document.getElementById('videoForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const platform = document.getElementById('platform').value;
+        const url = document.getElementById('videoUrl').value;
+        const segmentLength = document.getElementById('segmentLength').value;
+
+        const responseMessage = document.getElementById('responseMessage');
+        responseMessage.textContent = "Processing...";
+
+        try {
+          let endpoint = platform === 'youtube' ? '/process-video' : `/download-${platform}`;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(platform === 'youtube' ? { url, segment_length: segmentLength } : { url })
+          });
+
+          if (response.ok) {
+            responseMessage.textContent = "Video processed successfully!";
+            fetchProcessedVideos(); // Refresh the list after processing
+          } else {
+            responseMessage.textContent = `Error processing video.`;
+          }
+        } catch (error) {
+          responseMessage.textContent = `Error: ${error}`;
+        }
+      });
+
+      // AI Video Generator Form Submission
+      document.getElementById('aiVideoForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const script = document.getElementById('aiScript').value;
+
+        const aiResponseMessage = document.getElementById('aiResponseMessage');
+        aiResponseMessage.textContent = "Generating video...";
+
+        try {
+          const response = await fetch('/generate-test-to-video', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ script })
+          });
+
+          if (response.ok) {
+            aiResponseMessage.textContent = "AI Video generated successfully!";
+            fetchProcessedVideos(); // Refresh the list after generating AI video
+          } else {
+            aiResponseMessage.textContent = "Error generating AI video.";
+          }
+        } catch (error) {
+          aiResponseMessage.textContent = `Error: ${error}`;
+        }
+      });
+    });
+
+    async function fetchProcessedVideos() {
+      try {
+        const response = await fetch('/list-videos');
+        const data = await response.json();
+        const videoList = document.getElementById('videoList');
+        videoList.innerHTML = ''; // Clear existing content
+
+        data.forEach(video => {
+          const li = document.createElement('li');
+          li.className = "bg-white rounded-lg shadow-lg p-4";
+
+          let fileContent = '';
+
+          // Loop through each file URL and add a download button for each
+          video.file_urls.forEach((file, index) => {
+            fileContent += `
+                          <div class="mb-4">
+                              <button class="px-4 py-2 mt-2 bg-green-600 text-white rounded hover:bg-green-500"
+                                      onclick="downloadShort('${file}', ${index})">
+                                  Download Short ${index + 1}
+                              </button>
+                          </div>
+                      `;
+          });
+
+          li.innerHTML = `
+                      <h3 class="font-bold mb-2">Original Video URL:</h3>
+                      <a href="${video.video_url}" target="_blank" class="text-blue-500 underline">${video.video_url}</a>
+                      <div class="mt-4">
+                          ${fileContent}
+                      </div>
+                  `;
+          videoList.appendChild(li);
+        });
+      } catch (error) {
+        console.error("Error fetching video list:", error);
+      }
+    }
+
+    async function downloadShort(fileKey, index) {
+      try {
+        const key = getFileKeyFromUrl(fileKey);
+        if (key) {
+          const response = await fetch(`/get-presigned-url?file_key=${key}`);
+          const data = await response.json();
+          if (data.url) {
+            const a = document.createElement('a');
+            a.href = data.url;
+            a.download = fileKey.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching pre-signed URL:", error);
+      }
+    }
+
+    function getFileKeyFromUrl(fileUrl) {
+      const parts = fileUrl.split('.com/');
+      if (parts.length > 1) {
+        return parts[1];
+      }
+      return null;
+    }
+  </script>
+</body>
+
+</html>
